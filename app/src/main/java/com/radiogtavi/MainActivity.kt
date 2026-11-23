@@ -21,12 +21,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun login() {
-        val req = AuthorizationRequest.Builder(
-            RadioViewModel.CLIENT_ID,
-            AuthorizationResponse.Type.TOKEN,
-            RadioViewModel.REDIRECT_URI
-        ).setScopes(arrayOf("playlist-read-private", "playlist-read-collaborative")).build()
-        AuthorizationClient.openLoginActivity(this, REQ, req)
+    val req = AuthorizationRequest.Builder(
+        RadioViewModel.CLIENT_ID,
+        AuthorizationResponse.Type.TOKEN,
+        RadioViewModel.REDIRECT_URI
+    )
+        .setScopes(arrayOf("playlist-read-private", "playlist-read-collaborative"))
+        .setShowDialog(true)
+        .build()
+    AuthorizationClient.openLoginInBrowser(this, req)
     }
 
     @Deprecated("Deprecated in Java")
