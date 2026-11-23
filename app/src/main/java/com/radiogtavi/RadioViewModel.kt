@@ -1,15 +1,26 @@
 package com.radiogtavi
 
 import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import android.util.Base64
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
 import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.protocol.types.PlayerState
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.SecureRandom
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -20,6 +31,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = Prefs(app)
     private var remote: SpotifyAppRemote? = null
+    private var codeVerifier: String = ""
 
     val allPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
     val stations = MutableStateFlow<List<Playlist>>(emptyList())
@@ -29,7 +41,66 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
     val needsLogin = MutableStateFlow(true)
     val picking = MutableStateFlow(false)
 
+    // ---------- Connexion Spotify (Authorization Code + PKCE) ----------
+
+    fun buildLoginIntent(): Intent {
+        val bytes = ByteArray(64).also { SecureRandom().nextBytes(it) }
+        codeVerifier = Base64.encodeToString(
+            bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+        val challenge = Base64.encodeToString(
+            MessageDigest.getInstance("SHA-256").digest(codeVerifier.toByteArray()),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+        val url = "https://accounts.spotify.com/authorize" +
+            "?client_id=" + URLEncoder.encode(CLIENT_ID, "UTF-8") +
+            "&response_type=code" +
+            "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, "UTF-8") +
+            "&scope=" + URLEncoder.encode("playlist-read-private playlist-read-collaborative", "UTF-8") +
+            "&code_challenge_method=S256" +
+            "&code_challenge=" + challenge +
+            "&show_dialog=true"
+        return Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    }
+
+    fun handleRedirect(uri: Uri) {
+        if (uri.scheme != "radiogtavi") return
+        val code = uri.getQueryParameter("code")
+        if (code == null) {
+            status.value = "Connexion refusee : ${uri.getQueryParameter("error") ?: "inconnue"}"
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val token = withContext(Dispatchers.IO) { exchangeCode(code) }
+                onToken(token)
+            } catch (e: Exception) {
+                status.value = "Erreur token : ${e.message}"
+            }
+        }
+    }
+
+    private fun exchangeCode(code: String): String {
+        val body = "grant_type=authorization_code" +
+            "&code=" + URLEncoder.encode(code, "UTF-8") +
+            "&redirect_uri=" + URLEncoder.encode(REDIRECT_URI, "UTF-8") +
+            "&client_id=" + URLEncoder.encode(CLIENT_ID, "UTF-8") +
+            "&code_verifier=" + URLEncoder.encode(codeVerifier, "UTF-8")
+        val conn = URL("https://accounts.spotify.com/api/token").openConnection() as HttpURLConnection
+        conn.requestMethod = "POST"
+        conn.doOutput = true
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+        conn.outputStream.use { it.write(body.toByteArray()) }
+        val ok = conn.responseCode in 200..299
+        val text = (if (ok) conn.inputStream else conn.errorStream).bufferedReader().readText()
+        if (!ok) throw Exception(text)
+        return JSONObject(text).getString("access_token")
+    }
+
+    // ---------- Logique radio (inchangee) ----------
+
     fun hasToken() = prefs.token != null
+
     fun onToken(token: String) {
         prefs.token = token
         needsLogin.value = false
