@@ -41,4 +41,33 @@ class SpotifyApi(private val token: String) {
         }
         result
     }
+
+    /** Charge des playlists precises par ID. Si une playlist est refusee par l'API,
+     *  on la garde quand meme avec un nom/pochette de secours (la lecture marchera). */
+    suspend fun getPlaylistsByIds(ids: List<String>): List<Playlist> = withContext(Dispatchers.IO) {
+        ids.mapIndexed { index, id ->
+            try {
+                val req = Request.Builder()
+                    .url("https://api.spotify.com/v1/playlists/$id?fields=id,name,images,tracks.total")
+                    .header("Authorization", "Bearer $token")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) error("code ${resp.code}")
+                    val o = JsonParser.parseString(resp.body!!.string()).asJsonObject
+                    val images = o.getAsJsonArray("images")
+                    val img = if (images != null && images.size() > 0)
+                        images[0].asJsonObject.get("url").asString else null
+                    val tracks = o.getAsJsonObject("tracks")?.get("total")?.asInt ?: 0
+                    Playlist(
+                        id = id,
+                        name = o.get("name").asString,
+                        imageUrl = img,
+                        trackCount = tracks
+                    )
+                }
+            } catch (e: Exception) {
+                Playlist(id = id, name = "Station ${index + 1}", imageUrl = null, trackCount = 0)
+            }
+        }
+    }
 }
