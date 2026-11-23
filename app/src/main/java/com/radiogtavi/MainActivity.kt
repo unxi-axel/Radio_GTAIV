@@ -15,6 +15,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RadioScreen(vm = vm, onLogin = { startActivity(vm.buildLoginIntent()) })
         }
+        if (vm.hasToken()) vm.startIfPossible()
         intent?.data?.let { vm.handleRedirect(it) }
     }
 
