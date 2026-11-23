@@ -7,10 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -28,7 +24,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 
@@ -40,12 +35,10 @@ private val Dark2 = Color(0xFF2A0845)
 @Composable
 fun RadioScreen(vm: RadioViewModel, onLogin: () -> Unit) {
     val needsLogin by vm.needsLogin.collectAsStateWithLifecycle()
-    val picking by vm.picking.collectAsStateWithLifecycle()
     val stations by vm.stations.collectAsStateWithLifecycle()
     val current by vm.current.collectAsStateWithLifecycle()
     val now by vm.nowPlaying.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
-    val all by vm.allPlaylists.collectAsStateWithLifecycle()
 
     Box(
         Modifier
@@ -54,8 +47,7 @@ fun RadioScreen(vm: RadioViewModel, onLogin: () -> Unit) {
     ) {
         when {
             needsLogin -> LoginView(onLogin, status)
-            picking -> PickerView(all, vm)
-            stations.isEmpty() -> Centered("Aucune station. Appuie longuement pour choisir.")
+            stations.isEmpty() -> Centered("Chargement des stations...")
             else -> WheelView(stations, current, now, vm)
         }
     }
@@ -88,51 +80,6 @@ private fun LoginView(onLogin: () -> Unit, status: String) {
 }
 
 @Composable
-private fun PickerView(all: List<Playlist>, vm: RadioViewModel) {
-    val selected = remember { mutableStateListOf<String>().also { it.addAll(vm.stations.value.map { s -> s.id }) } }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text("CHOISIS TES STATIONS", color = Cyan, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(12.dp))
-        LazyColumn(Modifier.weight(1f)) {
-            items(all) { p ->
-                val on = p.id in selected
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (on) Pink.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.06f))
-                        .clickable { if (on) selected.remove(p.id) else selected.add(p.id) }
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = p.imageUrl, contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp))
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(p.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${p.trackCount} titres", color = Color.Gray, fontSize = 12.sp)
-                    }
-                    Checkbox(
-                        checked = on, onCheckedChange = null,
-                        colors = CheckboxDefaults.colors(checkedColor = Pink)
-                    )
-                }
-            }
-        }
-        Button(
-            onClick = { vm.saveStations(selected.toList()) },
-            enabled = selected.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Pink)
-        ) { Text("VALIDER (${selected.size})") }
-    }
-}
-
-@Composable
 private fun WheelView(stations: List<Playlist>, current: Int, now: NowPlaying?, vm: RadioViewModel) {
     var dragX by remember { mutableStateOf(0f) }
     val n = stations.size
@@ -151,9 +98,6 @@ private fun WheelView(stations: List<Playlist>, current: Int, now: NowPlaying?, 
                     }
                 )
             }
-            .pointerInput(Unit) {
-                detectTapGestures(onLongPress = { vm.openPicker() })
-                        }
             .padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -183,7 +127,7 @@ private fun WheelView(stations: List<Playlist>, current: Int, now: NowPlaying?, 
             overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 24.dp))
 
         Spacer(Modifier.weight(1f))
-        Text("Glisse pour changer de station  |  Appui long : gerer", color = Color.Gray, fontSize = 11.sp)
+        Text("Glisse pour changer de station", color = Color.Gray, fontSize = 11.sp)
     }
 }
 
