@@ -154,7 +154,6 @@ private fun WheelView(stations: List<Playlist>, current: Int, now: NowPlaying?, 
             .pointerInput(Unit) {
                 detectTapGestures(onLongPress = { vm.openPicker() })
                         }
-            }
             .padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
