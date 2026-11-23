@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
-        const val CLIENT_ID = "COLLE_TON_CLIENT_ID_ICI"
+        const val CLIENT_ID = "7db5cd521ce14642b07a675d085d65de"
         const val REDIRECT_URI = "radiogtavi://callback"
     }
 
