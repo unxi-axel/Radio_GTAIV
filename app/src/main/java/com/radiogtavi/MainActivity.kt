@@ -26,6 +26,13 @@ class MainActivity : ComponentActivity() {
         AuthorizationResponse.Type.TOKEN,
         RadioViewModel.REDIRECT_URI
     )
+    override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    val uri = intent?.data ?: return
+    val resp = AuthorizationResponse.fromUri(uri)
+    if (resp.type == AuthorizationResponse.Type.TOKEN) vm.onToken(resp.accessToken)
+    else vm.status.value = "Connexion refusee : ${resp.error ?: resp.type}"
+    }
         .setScopes(arrayOf("playlist-read-private", "playlist-read-collaborative"))
         .setShowDialog(true)
         .build()
@@ -33,12 +40,5 @@ class MainActivity : ComponentActivity() {
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ) {
-            val resp = AuthorizationClient.getResponse(resultCode, data)
-            if (resp.type == AuthorizationResponse.Type.TOKEN) vm.onToken(resp.accessToken)
-            else vm.status.value = "Connexion refusee : ${resp.error ?: resp.type}"
-        }
     }
 }
