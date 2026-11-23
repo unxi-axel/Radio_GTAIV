@@ -22,30 +22,16 @@ jobs:
       - name: Installer Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.7
-
-      - name: Restaurer la clé debug
-        id: keycache
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: debug-keystore-radiogtavi
-
-      - name: Créer la clé si absente
-        if: steps.keycache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          gradle-version: 8.9
 
       - name: Compiler l'APK
-        working-directory: App
         run: gradle assembleDebug --no-daemon
 
       - name: Afficher SHA-1
-        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+        run: keytool -list -v -keystore app/radiogtavi.keystore -alias radiogtavi -storepass radiogtavi | grep -E "SHA1|SHA-1"
 
       - name: Envoyer l'APK
         uses: actions/upload-artifact@v4
         with:
           name: Radio-GTAVI-APK
-          path: App/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
