@@ -152,7 +152,8 @@ private fun WheelView(stations: List<Playlist>, current: Int, now: NowPlaying?, 
                 )
             }
             .pointerInput(Unit) {
-                androidx.compose.foundation.gestures.detectTapGestures(onLongPress = { vm.openPicker() })
+                detectTapGestures(onLongPress = { vm.openPicker() })
+                        }
             }
             .padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
