@@ -17,7 +17,6 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -27,19 +26,40 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         const val CLIENT_ID = "7db5cd521ce14642b07a675d085d65de"
         const val REDIRECT_URI = "radiogtavi://callback"
+
+        // Playlists imposees (ordre = ordre des stations)
+        val STATION_IDS = listOf(
+            "37i9dQZF1DXcGCMmxwmtXk",
+            "37i9dQZF1DX6wHAaQgEaql",
+            "37i9dQZF1DWSl1fPFVnb1Q",
+            "37i9dQZF1DXbPiTvBXRA4K",
+            "37i9dQZF1DXcsfnAtkn9GL",
+            "37i9dQZF1DX1ZcUqIGOF7E",
+            "37i9dQZF1DWW3zGGXBB1qW",
+            "37i9dQZF1DX2esb8L2ZuIN",
+            "37i9dQZF1DWWLeCsyejmsh",
+            "37i9dQZF1DX4fmN0DulRNZ",
+            "37i9dQZF1DWXTWbz68EG90",
+            "37i9dQZF1DWSsYu3Tj6uGn",
+            "37i9dQZF1DXdGIiMhKyPsA",
+            "37i9dQZF1DX5PWb8VgtRes",
+            "37i9dQZF1DWSRdro1ZJ0nG",
+            "37i9dQZF1DWURyzas9h4zm",
+            "37i9dQZF1DWX5C5DqVMcOk",
+            "37i9dQZF1DXaWImNAzqnz6",
+            "37i9dQZF1DXaPd3e6CWiCG"
+        )
     }
 
     private val prefs = Prefs(app)
     private var remote: SpotifyAppRemote? = null
     private var codeVerifier: String = ""
 
-    val allPlaylists = MutableStateFlow<List<Playlist>>(emptyList())
     val stations = MutableStateFlow<List<Playlist>>(emptyList())
     val current = MutableStateFlow(0)
     val nowPlaying = MutableStateFlow<NowPlaying?>(null)
     val status = MutableStateFlow("Connexion...")
     val needsLogin = MutableStateFlow(true)
-    val picking = MutableStateFlow(false)
 
     // ---------- Connexion Spotify (Authorization Code + PKCE) ----------
 
@@ -97,14 +117,14 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
         return JSONObject(text).getString("access_token")
     }
 
-    // ---------- Logique radio (inchangee) ----------
+    // ---------- Logique radio ----------
 
     fun hasToken() = prefs.token != null
 
     fun onToken(token: String) {
         prefs.token = token
         needsLogin.value = false
-        loadPlaylists(token)
+        loadStations(token)
         connectRemote()
     }
 
@@ -112,40 +132,25 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
         val t = prefs.token
         if (t != null) {
             needsLogin.value = false
-            loadPlaylists(t)
+            loadStations(t)
             connectRemote()
         }
     }
 
-    private fun loadPlaylists(token: String) = viewModelScope.launch {
+    private fun loadStations(token: String) = viewModelScope.launch {
         try {
-            val all = SpotifyApi(token).getMyPlaylists()
-            allPlaylists.value = all
-            refreshStations()
-            if (prefs.stationIds.isEmpty()) picking.value = true
+            val list = SpotifyApi(token).getPlaylistsByIds(STATION_IDS)
+            stations.value = list
+            val last = prefs.lastStationId
+            val idx = list.indexOfFirst { it.id == last }
+            current.value = if (idx >= 0) idx else 0
+            if (remote != null && list.isNotEmpty()) tune(current.value)
         } catch (e: Exception) {
             status.value = "Erreur : ${e.message}"
             prefs.token = null
             needsLogin.value = true
         }
     }
-
-    private fun refreshStations() {
-        val ids = prefs.stationIds
-        stations.value = ids.mapNotNull { id -> allPlaylists.value.find { it.id == id } }
-        val last = prefs.lastStationId
-        val idx = stations.value.indexOfFirst { it.id == last }
-        current.value = if (idx >= 0) idx else 0
-    }
-
-    fun saveStations(ids: List<String>) {
-        prefs.stationIds = ids
-        refreshStations()
-        picking.value = false
-        if (stations.value.isNotEmpty()) tune(current.value)
-    }
-
-    fun openPicker() { picking.value = true }
 
     private fun connectRemote() {
         val params = ConnectionParams.Builder(CLIENT_ID)
